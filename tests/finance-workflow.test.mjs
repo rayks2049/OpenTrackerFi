@@ -27,10 +27,7 @@ function summarize(data, now = SEPTEMBER_3) {
     investments: total('investment'),
     projected: data.salary - expenses,
     liquid: data.accounts
-      .filter(
-        (account) =>
-          !account.archived && !['Investment', 'Crypto'].includes(account.type),
-      )
+      .filter((account) => !account.archived)
       .reduce((sum, account) => sum + account.balance, 0),
   };
 }
@@ -248,6 +245,19 @@ test('zero-everything contract removes current finance data', () => {
   });
 });
 
+test('activity category determines expense, saving, or investment type', () => {
+  const classify = (category) =>
+    category === 'Savings'
+      ? 'saving'
+      : category === 'Investments'
+        ? 'investment'
+        : 'expense';
+  assert.equal(classify('Food'), 'expense');
+  assert.equal(classify('Bills'), 'expense');
+  assert.equal(classify('Savings'), 'saving');
+  assert.equal(classify('Investments'), 'investment');
+});
+
 test('source wiring keeps projection and logging placement aligned', async () => {
   const source = await readFile(
     new URL('../app/page.tsx', import.meta.url),
@@ -255,13 +265,13 @@ test('source wiring keeps projection and logging placement aligned', async () =>
   );
   assert.match(source, /const projected = data\.salary - expenses;/);
   assert.match(source, /onLogExpense=\{\(\) => setAddOpen\(true\)\}/);
-  assert.match(source, />Log daily expense</);
+  assert.match(source, />Log activity</);
   assert.match(source, /<CardTitle>Monthly allocations<\/CardTitle>/);
   assert.match(source, /if \(daily\.size < 7\) return null;/);
-  assert.match(
-    source,
-    /Log expenses for at least 7 days to detect spending spikes\./,
-  );
+  assert.match(source, /Limited data/);
+  assert.match(source, /Classified as/);
+  assert.doesNotMatch(source, /Account type/);
+  assert.doesNotMatch(source, /<DialogTitle>Log daily expense<\/DialogTitle>/);
   assert.doesNotMatch(source, /onAddEntry=\{\(\) => setAddOpen\(true\)\}/);
   assert.match(
     source,

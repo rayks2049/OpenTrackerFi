@@ -20,6 +20,7 @@ An Android release is planned for the future. Native Android project foundations
 - Local backup and restore, including encrypted backup support
 - Dark mode and responsive bottom navigation
 - Offline-first local storage
+- Guided setup progress, daily tracking streaks, and responsible milestones
 
 ## Financial calculations
 
@@ -30,6 +31,10 @@ Monthly salary - expense entries logged during the current month
 ```
 
 Monthly allocations are planning labels and do not reduce the projected balance. Savings and investment entries are included in analytics but are kept separate from the expense projection.
+
+The projection is visible immediately with a limited-data notice and estimation disclaimer. Seven distinct expense logging days are recommended before treating trend behavior as data-backed.
+
+Daily logging follows a short amount → category → account flow. Savings and Investments are classified automatically from the selected category; allocation breakdowns remain planning-only.
 
 ## Technology
 
