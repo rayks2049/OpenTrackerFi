@@ -1,6 +1,61 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import ts from 'typescript';
+
+// Load the actual extracted TypeScript services without creating build artifacts.
+const moduleUrls = new Map();
+async function financeModuleUrl(path) {
+  if (moduleUrls.has(path)) return moduleUrls.get(path);
+  const source = await readFile(new URL(`../${path}.ts`, import.meta.url), 'utf8');
+  let code = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  for (const match of [...code.matchAll(/from ['"](@\/src\/[^'"]+)['"]/g)]) {
+    const url = await financeModuleUrl(match[1].replace('@/', ''));
+    code = code.replaceAll(match[1], url);
+  }
+  const url = `data:text/javascript;base64,${Buffer.from(code).toString('base64')}`;
+  moduleUrls.set(path, url);
+  return url;
+}
+
+test('extracted storage preserves existing records and empty production defaults', async () => {
+  const { migrate } = await import(await financeModuleUrl('src/services/local-storage'));
+  const empty = migrate(null);
+  assert.equal(empty.salary, 0);
+  assert.deepEqual(empty.accounts, []);
+  assert.deepEqual(empty.transactions, []);
+  const existing = { ...fixture(), version: 4, nextPayday: '2026-09-15' };
+  assert.deepEqual(migrate(JSON.parse(JSON.stringify(existing))), existing);
+});
+
+test('extracted analytics ignore corrections and preserve allocation independence', async () => {
+  const { analyze, activitySeries } = await import(await financeModuleUrl('src/features/analytics/calculations'));
+  const date = new Date().toISOString();
+  const data = { ...fixture(), transactions: [
+    { id: 'expense', date, type: 'expense', amount: 100 },
+    { id: 'saving', date, type: 'saving', amount: 25 },
+    { id: 'investment', date, type: 'investment', amount: 10 },
+    { id: 'correction', date, type: 'value_adjustment', amount: 9000 },
+  ] };
+  const actual = analyze(data.transactions, 30);
+  assert.equal(actual.expenses, 100);
+  assert.equal(actual.savings, 25);
+  assert.equal(actual.investments, 10);
+  assert.equal(actual.ratio, 0.35);
+  const before = activitySeries(data, '30d');
+  data.subcategories = [];
+  assert.deepEqual(activitySeries(data, '30d'), before);
+});
+
+test('extracted backup service encrypts and restores real finance data', async () => {
+  const { encryptBackup, decryptBackup } = await import(await financeModuleUrl('src/services/backup'));
+  const data = { ...fixture(), version: 4 };
+  const encrypted = await encryptBackup(data, 'test-password-only');
+  assert.deepEqual(await decryptBackup(encrypted, 'test-password-only'), data);
+  await assert.rejects(() => decryptBackup(encrypted, 'wrong-password'));
+});
 
 const SEPTEMBER_3 = new Date('2026-09-03T12:00:00+08:00');
 
@@ -259,10 +314,17 @@ test('activity category determines expense, saving, or investment type', () => {
 });
 
 test('source wiring keeps projection and logging placement aligned', async () => {
-  const source = await readFile(
-    new URL('../app/page.tsx', import.meta.url),
-    'utf8',
-  );
+  const modules = [
+    'app/finance-tracker.tsx',
+    'features/dashboard/dashboard.tsx',
+    'features/activity/activity.tsx',
+    'features/activity/add-dialog.tsx',
+    'features/plans/plan.tsx',
+    'features/analytics/calculations.ts',
+  ];
+  const source = (await Promise.all(modules.map((path) =>
+    readFile(new URL(`../src/${path}`, import.meta.url), 'utf8'),
+  ))).join('\n');
   assert.match(source, /const projected = data\.salary - expenses;/);
   assert.match(source, /onLogExpense=\{\(\) => setAddOpen\(true\)\}/);
   assert.match(source, />Log activity</);

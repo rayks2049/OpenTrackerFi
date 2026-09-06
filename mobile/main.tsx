@@ -1,4 +1,5 @@
 import React from 'react';
+import '../src/lib/fonts';
 import { createRoot } from 'react-dom/client';
 import HomePage from '../app/page';
 import '../app/globals.css';

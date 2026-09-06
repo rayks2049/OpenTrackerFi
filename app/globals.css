@@ -22,8 +22,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --font-sans: var(--font-geist-sans);
-  --font-heading: var(--font-geist-sans);
+  --font-sans: 'Poppins', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: 'Poppins', ui-sans-serif, system-ui, sans-serif;
   --radius-sm: 0.5rem;
   --radius-md: 0.7rem;
   --radius-lg: 0.9rem;
@@ -76,13 +76,14 @@
   }
   html {
     @apply font-sans;
+    font-variant-numeric: tabular-nums;
     color-scheme: light;
   }
   html.dark {
     color-scheme: dark;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
     background-image: radial-gradient(
       circle at 15% 0%,
       color-mix(in oklab, var(--primary) 8%, transparent),

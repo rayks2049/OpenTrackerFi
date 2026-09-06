@@ -36,6 +36,37 @@ The projection is visible immediately with a limited-data notice and estimation 
 
 Daily logging follows a short amount → category → account flow. Savings and Investments are classified automatically from the selected category; allocation breakdowns remain planning-only.
 
+## Source structure
+
+```text
+app/page.tsx                    Web route; forwards to the shared app
+app/globals.css                 Shared theme and styles
+mobile/main.tsx                 Static SPA / future Android entry
+src/
+  app/finance-tracker.tsx       Shared state, navigation, and page composition
+  types/finance.ts             Account, transaction, allocation, and plan types
+  lib/finance.ts               Empty defaults, categories, and common helpers
+  components/finance-ui.tsx    Shared tooltips, metrics, and activity rows
+  features/
+    dashboard/                 Overview and setup progress
+    accounts/                  Account list, editing, and balance corrections
+    activity/                  Activity history, filters, and entry form
+    allocations/               Monthly allocation breakdown editor
+    plans/                     Plan settings and analytics presentation
+    analytics/                 Pure chart, ratio, and streak calculations
+    settings/                  Salary settings, reset, and export workflows
+  services/
+    local-storage.ts           Loading and existing-data migration
+    backup.ts                  Backup encryption and decryption
+components/ui/                 Existing reusable interface primitives
+tests/                         Finance workflow and module regression checks
+```
+
+The web route and static SPA share one state owner. Feature components receive
+the same records and update callback, keeping account balances and analytics
+consistent across pages. Local storage keys and the existing record schema are
+preserved. This scaffold does not activate cloud sync or market integrations.
+
 ## Technology
 
 - React 19
