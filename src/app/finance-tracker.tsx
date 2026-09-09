@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { CircleDollarSign, Home, Moon, ReceiptText, Settings, Sun, Target, WalletCards, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import type { View, ParentCategory, Transaction, FinanceData, Summary } from '@/src/types/finance';
-import { seedData, uid, accountName, isCashflow, daysUntil } from '@/src/lib/finance';
+import type { View, ParentCategory, Transaction, FinanceData } from '@/src/types/finance';
+import { seedData, uid, accountName, isCashflow } from '@/src/lib/finance';
+import { summarizeFinance } from '@/src/lib/balance-summary';
 import { loadData } from '@/src/services/local-storage';
 import { Dashboard } from '@/src/features/dashboard/dashboard';
 import { Activity } from '@/src/features/activity/activity';
@@ -25,6 +26,21 @@ export default function HomePage() {
   const [addOpen, setAddOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [breakdown, setBreakdown] = useState<ParentCategory | null>(null);
+
+  useEffect(() => {
+    const handleBack = (event: Event) => {
+      const dialog = document.querySelector('[data-slot="dialog-content"]');
+      if (dialog) {
+        event.preventDefault();
+        dialog.querySelector<HTMLButtonElement>('[data-slot="dialog-close"]')?.click();
+      } else if (view !== 'home') {
+        event.preventDefault();
+        setView('home');
+      }
+    };
+    window.addEventListener('opentracker-back', handleBack);
+    return () => window.removeEventListener('opentracker-back', handleBack);
+  }, [view]);
 
   useEffect(() => {
     setData(loadData());
@@ -48,48 +64,7 @@ export default function HomePage() {
     if (ready) localStorage.setItem('sahod-data', JSON.stringify(data));
   }, [data, ready]);
 
-  const summary = useMemo<Summary>(() => {
-    const liquid = data.accounts
-      .filter((a) => !a.archived)
-      .reduce((sum, item) => sum + item.balance, 0);
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
-    const monthlyEntries = data.transactions.filter(
-      (item) => new Date(item.date) >= monthStart,
-    );
-    const expenses = monthlyEntries
-      .filter((item) => item.type === 'expense')
-      .reduce((sum, item) => sum + item.amount, 0);
-    const savings = monthlyEntries
-      .filter((item) => item.type === 'saving')
-      .reduce((sum, item) => sum + item.amount, 0);
-    const investments = monthlyEntries
-      .filter((item) => item.type === 'investment')
-      .reduce((sum, item) => sum + item.amount, 0);
-    const reserved = 0;
-    const days = daysUntil(data.nextPayday);
-    const dailyAverage = expenses / Math.max(1, new Date().getDate());
-    const estimatedRemaining = expenses;
-    const unpaidReserve = 0;
-    const projected = data.salary - expenses;
-    const safe = Math.max(0, projected / days);
-    const ratio = expenses ? (savings + investments) / expenses : 0;
-    return {
-      liquid,
-      expenses,
-      savings,
-      investments,
-      reserved,
-      dailyAverage,
-      estimatedRemaining,
-      remainingTarget: unpaidReserve,
-      days,
-      projected,
-      safe,
-      ratio,
-    };
-  }, [data]);
+  const summary = useMemo(() => summarizeFinance(data), [data]);
 
   function toggleTheme() {
     const next = !dark;
@@ -136,9 +111,9 @@ export default function HomePage() {
   ];
   return (
     <TooltipProvider>
-      <main className="min-h-screen bg-background text-foreground">
-        <div className="mx-auto min-h-screen max-w-6xl pb-28">
-          <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border/70 bg-background/90 px-5 py-4 backdrop-blur-xl md:px-8">
+      <main className="app-safe-screen bg-background text-foreground">
+        <div className="app-safe-content mx-auto max-w-6xl">
+          <header className="app-safe-header sticky top-0 z-30 flex items-center justify-between border-b border-border/70 bg-background/90 px-5 py-4 backdrop-blur-xl md:px-8">
             <button
               onClick={() => setView('home')}
               className="flex items-center gap-3 text-left"
@@ -208,7 +183,7 @@ export default function HomePage() {
             )}
             {view === 'accounts' && <Accounts data={data} setData={setData} />}
           </section>
-          <nav className="fixed bottom-3 left-1/2 z-40 flex w-[calc(100%-1.5rem)] max-w-xl -translate-x-1/2 justify-around rounded-[1.4rem] border border-border/80 bg-card/95 p-2 shadow-2xl backdrop-blur-xl">
+          <nav className="app-safe-nav fixed z-40 flex max-w-xl -translate-x-1/2 justify-around rounded-[1.4rem] border border-border/80 bg-card/95 p-2 shadow-2xl backdrop-blur-xl">
             {nav.map((item) => {
               const Icon = item.icon,
                 active = view === item.id;

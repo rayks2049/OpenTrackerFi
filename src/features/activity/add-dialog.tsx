@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import type { ParentCategory, EntryType, Account, Transaction, FinanceData } from '@/src/types/finance';
+import type { ParentCategory, EntryType, Transaction, FinanceData } from '@/src/types/finance';
 import { parents, accountName } from '@/src/lib/finance';
 
 export function AddDialog({
@@ -62,7 +62,7 @@ export function AddDialog({
         </DialogHeader>
         {!activeAccounts.length ? (
           <div className="space-y-3 rounded-xl bg-amber-500/10 p-4 text-sm">
-            <p>Add or restore an account before recording an activity.</p>
+            <p>Add an account before recording an activity.</p>
             <Button type="button" onClick={onNeedAccount}>
               Add an account
             </Button>

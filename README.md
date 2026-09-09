@@ -5,15 +5,17 @@
 
 OpenTrackerFi is a private, offline-first personal finance tracker designed around day-to-day budgeting in Philippine pesos. It currently runs as a single-page web application (SPA), storing finance data locally on the user's device without requiring an account or external database.
 
-An Android release is planned for the future. Native Android project foundations are being prepared, but the supported release for now remains the SPA.
+An Android debug APK is available for device testing. It uses the same offline app, with safe-area spacing, a branded launch splash, and a double-back exit prompt on Home.
 
 ## Features
 
 - Dynamic monthly salary and payday settings
 - Monthly allocation planning with customizable subcategories
 - Daily expense, income, savings, and investment activity tracking
-- Customizable and archivable financial accounts
-- Dashboard projections based on salary minus current-month logged expenses
+- Customizable accounts with permanent deletion that preserves activity history
+- Consistent current account totals on Accounts, Dashboard, and Plan
+- Separate monthly salary remaining/shortfall and expense-budget warnings
+- Emergency-fund account selection and an editable target
 - Activity summaries for 7 days, 30 days, 6 months, and 1 year
 - Expense, savings, and investment comparisons with spike detection
 - CSV activity export and printable analytics reports
@@ -24,24 +26,28 @@ An Android release is planned for the future. Native Android project foundations
 
 ## Financial calculations
 
-The projected salary-based balance uses:
+The app keeps balances and activity totals separate:
 
-```text
-Monthly salary - expense entries logged during the current month
-```
+- Overall account balance is the sum of current remaining account balances.
+- Monthly salary remaining/shortfall is salary minus recorded expenses this calendar month. It is a comparison, not a forecast or an additional balance. Setting salary does not deposit money.
+- Expenses already debit the selected account. A salary shortfall is never deducted a second time.
+- Savings and investment entries debit the selected account and record contributions. They do not credit another account, represent current holdings, or get added to overall balance.
+- The emergency reserve uses the full positive balances of user-selected accounts. It is included in overall balance and excluded from available balance. Overdrafts still reduce overall balance; the emergency target does not move money.
+- The monthly expense budget sums active allocations except Savings and Investments. Warnings start at 80%; expenses above 100% show the excess. No configured budget displays a setup message. Exceeding salary is a separate warning.
+- The activity chart uses the current expense plan, prorated across its displayed buckets. Historical plans are not stored. The period selector affects activity analytics, not current balances or this month's salary/budget comparison.
 
-Monthly allocations are planning labels and do not reduce the projected balance. Savings and investment entries are included in analytics but are kept separate from the expense projection.
+Account deletion removes the account and its emergency selection, but retains all transactions and balance corrections. Deleting a historical activity from a deleted account does not recreate the account or change another account's balance.
 
-The projection is visible immediately with a limited-data notice and estimation disclaimer. Seven distinct expense logging days are recommended before treating trend behavior as data-backed.
+### Existing data
 
-Daily logging follows a short amount → category → account flow. Savings and Investments are classified automatically from the selected category; allocation breakdowns remain planning-only.
+The local storage key and version 4 format remain compatible, with an optional `emergencyAccountIds` field. Existing accounts previously marked removed are finalized as deleted when loading; activity and correction records remain. No accounts are automatically designated as emergency funds. Select the accounts holding that money on Plan; the existing emergency target is retained. Backup export/restore preserves these selections, and Zero everything clears them.
 
 ## Source structure
 
 ```text
 app/page.tsx                    Web route; forwards to the shared app
 app/globals.css                 Shared theme and styles
-mobile/main.tsx                 Static SPA / future Android entry
+mobile/main.tsx                 Static SPA / Android entry
 src/
   app/finance-tracker.tsx       Shared state, navigation, and page composition
   types/finance.ts             Account, transaction, allocation, and plan types
@@ -74,7 +80,7 @@ preserved. This scaffold does not activate cloud sync or market integrations.
 - Vinext and Vite
 - Tailwind CSS
 - Recharts
-- Capacitor foundations for the planned Android release
+- Capacitor Android packaging
 - Browser local storage for offline persistence
 
 ## Local development
@@ -112,7 +118,7 @@ npm run lint
 npm run build
 ```
 
-The QA suite covers projection calculations, allocation behavior, account consistency, deletion reversal, local data round-tripping, data reset behavior, and interface wiring.
+The QA suite covers salary comparisons, single expense deductions, deletion with retained history, emergency reserves, budget warning thresholds, migration, encryption, and interface wiring.
 
 ## Data and privacy
 
@@ -124,11 +130,19 @@ OpenTrackerFi is local-first. Finance records are saved in the browser storage o
 - Export a backup before clearing data, changing devices, or testing an update.
 - Never enter passwords, OTPs, private keys, wallet seed phrases, or exchange credentials.
 
-## Android roadmap
+## Android debug build (Windows)
 
-OpenTrackerFi is heading toward an Android release. The future package will preserve the offline-first experience while providing an installable Android application.
+Install JDK 21 and Android SDK platform 36/build tools 35.0.0, set `JAVA_HOME` and `ANDROID_HOME`, then run:
 
-Before a public Android release, the project still needs release signing, device testing, versioning, update delivery, and final privacy and security review. Until then, OpenTrackerFi should be treated as an SPA.
+```powershell
+npm run android:debug
+```
+
+The helper also detects the optional local tools under `work/android-tools`. Each successful build replaces `outputs/debug.apk` and moves the Gradle-generated APK there, rather than keeping duplicate APK versions. A failed compilation leaves the previous APK intact. Tools, caches, APKs, and signing keys are not committed.
+
+The APK supports Android 7+. Back closes a dialog first, returns another page to Home next, and requires a second Back press within two seconds to exit from Home. The launch splash uses the header's currency-circle mark on green, with a bounded wait for WebView loading.
+
+Install updates over the existing debug app signed with the same key to preserve local data. Export a backup before device testing. Public distribution still requires release signing and device validation.
 
 ## Investment disclaimer
 

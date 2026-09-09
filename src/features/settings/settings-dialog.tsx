@@ -5,10 +5,9 @@ import { Download, FileUp, Printer, RotateCcw, Settings, ShieldCheck } from 'luc
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import type { Period, Account, FinanceData, Summary } from '@/src/types/finance';
+import type { Period, FinanceData, Summary } from '@/src/types/finance';
 import { peso, periodDays } from '@/src/lib/finance';
 import { migrate } from '@/src/services/local-storage';
-import { Activity } from '@/src/features/activity/activity';
 import { analyze } from '@/src/features/analytics/calculations';
 import { encryptBackup, decryptBackup } from '@/src/services/backup';
 
@@ -69,8 +68,8 @@ export function SettingsDialog({
         'Account',
         'Amount',
         'Expenses',
-        'Savings',
-        'Investments',
+        'Savings contributed',
+        'Investments contributed',
         'Saved + invested ratio',
       ],
       ...data.transactions.map((item) => [
@@ -134,7 +133,7 @@ export function SettingsDialog({
       return;
     }
     report.document.write(
-      `<!doctype html><html><head><title>OpenTrackerFi finance report</title><style>body{font:14px system-ui;color:#17251d;max-width:920px;margin:32px auto;padding:0 20px}h1,h2{color:#006b42}small{color:#66736b}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.card{border:1px solid #ccd8d0;border-radius:12px;padding:14px}table{width:100%;border-collapse:collapse;margin:12px 0 28px}th,td{border-bottom:1px solid #dce5df;padding:8px;text-align:left}th{background:#edf6f1}@media print{body{margin:0}.no-print{display:none}}</style></head><body><button class="no-print" onclick="window.print()">Print or save as PDF</button><h1>OpenTrackerFi activity and analytics report</h1><small>Generated ${safe(new Date().toLocaleString('en-PH'))}</small><h2>Salary-based projection</h2><div class="cards"><div class="card">Monthly salary<br><strong>${peso.format(data.salary)}</strong></div><div class="card">Expenses logged this month<br><strong>${peso.format(summary.expenses)}</strong></div><div class="card">Projected salary-based balance<br><strong>${peso.format(summary.projected)}</strong></div></div><p>Formula: monthly salary - current-month expense entries. Monthly allocations are excluded.</p><h2>Analytics</h2><table><thead><tr><th>Period</th><th>Expenses</th><th>Savings</th><th>Investments</th><th>Ratio</th></tr></thead><tbody>${analyticsRows}</tbody></table><h2>Activity</h2><table><thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Description</th><th>Account</th><th>Amount</th></tr></thead><tbody>${activityRows || '<tr><td colspan="6">No recorded activity.</td></tr>'}</tbody></table></body></html>`,
+      `<!doctype html><html><head><title>OpenTrackerFi finance report</title><style>body{font:14px system-ui;color:#17251d;max-width:920px;margin:32px auto;padding:0 20px}h1,h2{color:#006b42}small{color:#66736b}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.card{border:1px solid #ccd8d0;border-radius:12px;padding:14px}table{width:100%;border-collapse:collapse;margin:12px 0 28px}th,td{border-bottom:1px solid #dce5df;padding:8px;text-align:left}th{background:#edf6f1}@media print{body{margin:0}.no-print{display:none}}</style></head><body><button class="no-print" onclick="window.print()">Print or save as PDF</button><h1>OpenTrackerFi activity and analytics report</h1><small>Generated ${safe(new Date().toLocaleString('en-PH'))}</small><h2>Current balances and monthly salary comparison</h2><div class="cards"><div class="card">Overall account balance<br><strong>${peso.format(summary.liquid)}</strong></div><div class="card">Emergency reserve<br><strong>${peso.format(summary.emergencyBalance)}</strong></div><div class="card">Available after emergency reserve<br><strong>${peso.format(summary.availableBalance)}</strong></div><div class="card">Monthly salary<br><strong>${peso.format(data.salary)}</strong></div><div class="card">Expenses logged this month<br><strong>${peso.format(summary.expenses)}</strong></div><div class="card">Monthly salary remaining / shortfall<br><strong>${peso.format(summary.projected)}</strong></div></div><p>Formula: monthly salary - current-month expense entries. This is not an account balance or forecast. Expenses are already reflected in account balances and are not deducted again.</p><h2>Analytics</h2><table><thead><tr><th>Period</th><th>Expenses</th><th>Savings contributed</th><th>Investments contributed</th><th>Ratio</th></tr></thead><tbody>${analyticsRows}</tbody></table><h2>Activity</h2><table><thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Description</th><th>Account</th><th>Amount</th></tr></thead><tbody>${activityRows || '<tr><td colspan="6">No recorded activity.</td></tr>'}</tbody></table></body></html>`,
     );
     report.document.close();
   }
@@ -150,6 +149,7 @@ export function SettingsDialog({
       ...current,
       salary: 0,
       emergencyTarget: 0,
+      emergencyAccountIds: [],
       plan: {
         minSavingsPercent: 0,
         maxSavingsPercent: 0,

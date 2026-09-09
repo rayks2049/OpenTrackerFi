@@ -29,6 +29,7 @@ export const seedData: FinanceData = {
     .toISOString()
     .slice(0, 10),
   emergencyTarget: 0,
+  emergencyAccountIds: [],
   plan: {
     minSavingsPercent: 0,
     maxSavingsPercent: 0,

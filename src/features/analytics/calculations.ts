@@ -1,14 +1,10 @@
 import type { Period, Transaction, FinanceData } from '@/src/types/finance';
+import { expenseBudget } from '@/src/lib/balance-summary';
 import { peso, dateWithin } from '@/src/lib/finance';
 
 export function activitySeries(data: FinanceData, period: Period) {
   if (period === '1y') return annualActivity(data);
-  const monthlyExpenseLimit = Math.max(
-    0,
-    data.salary *
-      (1 -
-        (data.plan.minSavingsPercent + data.plan.maxInvestmentPercent) / 100),
-  );
+  const monthlyExpenseLimit = expenseBudget(data);
   const today = new Date();
   today.setHours(23, 59, 59, 999);
   const ranges: { start: Date; end: Date; label: string; planned: number }[] =
@@ -125,18 +121,13 @@ export function summarizeActivityRange(
     planned: range.planned,
     peak:
       expenses > 0 &&
-      (expenses >= range.planned || expenses >= savings + investments),
+      (range.planned > 0 && expenses >= range.planned),
   };
 }
 
 export function annualActivity(data: FinanceData) {
   const year = new Date().getFullYear();
-  const planned = Math.max(
-    0,
-    data.salary *
-      (1 -
-        (data.plan.minSavingsPercent + data.plan.maxInvestmentPercent) / 100),
-  );
+  const planned = expenseBudget(data);
   return Array.from({ length: 12 }, (_, monthIndex) => {
     const monthTransactions = data.transactions.filter((transaction) => {
       const date = new Date(transaction.date);
@@ -194,7 +185,7 @@ export function annualActivity(data: FinanceData) {
       planned,
       peak:
         expenses > 0 &&
-        (expenses >= planned || expenses >= savings + investments),
+        (planned > 0 && expenses >= planned),
     };
   });
 }

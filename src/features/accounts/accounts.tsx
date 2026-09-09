@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import type { Account, FinanceData } from '@/src/types/finance';
+import { accountTotals, deleteAccount } from '@/src/lib/balance-summary';
 import { peso, uid, accountName } from '@/src/lib/finance';
 
 export function Accounts({
@@ -17,30 +18,11 @@ export function Accounts({
   setData: React.Dispatch<React.SetStateAction<FinanceData>>;
 }) {
   const [editing, setEditing] = useState<Account | null>(null),
-    [adding, setAdding] = useState(false),
-    [showArchived, setShowArchived] = useState(false);
-  const visible = data.accounts.filter((a) => showArchived || !a.archived);
-  function archive(account: Account) {
-    if (
-      !confirm(
-        `Remove ${accountName(account)} from current summaries? Its historical transactions will remain in analytics.`,
-      )
-    )
-      return;
-    setData((c) => ({
-      ...c,
-      accounts: c.accounts.map((a) =>
-        a.id === account.id ? { ...a, archived: true } : a,
-      ),
-    }));
-  }
-  function restore(account: Account) {
-    setData((c) => ({
-      ...c,
-      accounts: c.accounts.map((a) =>
-        a.id === account.id ? { ...a, archived: false } : a,
-      ),
-    }));
+    [adding, setAdding] = useState(false);
+  const visible = data.accounts.filter((account) => !account.archived);
+  function remove(account: Account) {
+    if (!confirm(`Permanently delete ${accountName(account)}? Its current balance will leave your overall balance and any emergency reserve. Activity and balance correction history will remain. This account cannot be restored.`)) return;
+    setData((current) => deleteAccount(current, account.id));
   }
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -52,14 +34,16 @@ export function Accounts({
           <h1 className="text-3xl font-bold">Accounts</h1>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowArchived((v) => !v)}>
-            {showArchived ? 'Hide removed' : 'Show removed'}
-          </Button>
           <Button onClick={() => setAdding(true)}>
             <Plus /> Add account
           </Button>
         </div>
       </div>
+      <Card><CardContent className="py-5">
+        <p className="text-sm text-muted-foreground">Overall account balance</p>
+        <p className="text-3xl font-bold text-primary">{peso.format(accountTotals(data).liquid)}</p>
+        <p className="mt-2 text-xs text-muted-foreground">The same current balance appears on Dashboard and Plan.</p>
+      </CardContent></Card>
       <div className="grid gap-4 md:grid-cols-2">
         {visible.map((account) => (
           <Card
@@ -74,7 +58,7 @@ export function Accounts({
                 <p className="truncate font-bold">{account.provider}</p>
                 <p className="truncate text-xs text-muted-foreground">
                   {account.nickname || 'Account'}
-                  {account.archived ? ' · Removed from summaries' : ''}
+                  {(data.emergencyAccountIds || []).includes(account.id) ? ' · Emergency fund' : ''}
                 </p>
               </div>
               <div className="text-right">
@@ -82,32 +66,8 @@ export function Accounts({
                   {peso.format(account.balance)}
                 </p>
                 <div className="mt-1 flex justify-end gap-1">
-                  {account.archived ? (
-                    <Button
-                      size="xs"
-                      variant="outline"
-                      onClick={() => restore(account)}
-                    >
-                      Restore
-                    </Button>
-                  ) : (
-                    <>
-                      <Button
-                        size="icon-xs"
-                        variant="ghost"
-                        onClick={() => setEditing(account)}
-                      >
-                        <Pencil />
-                      </Button>
-                      <Button
-                        size="icon-xs"
-                        variant="ghost"
-                        onClick={() => archive(account)}
-                      >
-                        <Trash2 />
-                      </Button>
-                    </>
-                  )}
+                  <Button size="icon-xs" variant="ghost" aria-label={`Edit ${accountName(account)}`} onClick={() => setEditing(account)}><Pencil /></Button>
+                  <Button size="icon-xs" variant="ghost" aria-label={`Delete ${accountName(account)}`} onClick={() => remove(account)}><Trash2 /></Button>
                 </div>
               </div>
             </CardContent>
@@ -122,9 +82,8 @@ export function Accounts({
         </Card>
       )}
       <p className="rounded-xl bg-muted p-3 text-xs leading-5 text-muted-foreground">
-        Removed accounts no longer contribute their current balance to dashboard
-        summaries or projections. Income, expenses, savings, and investments
-        previously recorded from them remain in your historical analytics.
+        Deleting an account permanently removes its current balance from all account totals.
+        Its activity and correction history remain. Historical expenses and contributions are unchanged.
       </p>
       <AccountDialog
         open={adding || !!editing}

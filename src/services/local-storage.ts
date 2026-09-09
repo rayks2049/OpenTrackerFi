@@ -3,7 +3,7 @@ import { parents, seedData, uid, accountName } from '@/src/lib/finance';
 
 export function migrate(raw: unknown): FinanceData {
   if (!raw || typeof raw !== 'object') return seedData;
-  const old = raw as Partial<FinanceData> & { categories?: string[] };
+  const old = raw as Omit<Partial<FinanceData>, 'version'> & { version?: number; categories?: string[] };
   if (
     (old.version === 3 || old.version === 4) &&
     old.subcategories &&
@@ -14,6 +14,9 @@ export function migrate(raw: unknown): FinanceData {
       ...old,
       version: 4,
       plan: old.plan || seedData.plan,
+      accounts: old.accounts.filter((account) => !account.archived),
+      emergencyAccountIds: (Array.isArray(old.emergencyAccountIds) ? old.emergencyAccountIds : [])
+        .filter((id, index, ids) => ids.indexOf(id) === index && old.accounts!.some((account) => account.id === id && !account.archived)),
     } as FinanceData;
   const legacyAccounts = (old.accounts || []).map(
     (item: Account & { name?: string }) => ({
@@ -58,6 +61,7 @@ export function migrate(raw: unknown): FinanceData {
     salary: Number(old.salary) || 0,
     nextPayday: old.nextPayday || seedData.nextPayday,
     emergencyTarget: Number(old.emergencyTarget) || 0,
+    emergencyAccountIds: [],
     plan: seedData.plan,
     accounts: legacyAccounts.length ? legacyAccounts : seedData.accounts,
     subcategories,

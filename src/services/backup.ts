@@ -1,6 +1,6 @@
 import type { FinanceData } from '@/src/types/finance';
 
-export async function deriveKey(password: string, salt: Uint8Array) {
+export async function deriveKey(password: string, salt: Uint8Array<ArrayBuffer>) {
   const material = await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(password),

@@ -100,6 +100,38 @@
 body {
   min-width: 320px;
 }
+/* Capacitor supplies these insets on older Android WebViews; browsers use env(). */
+:root {
+  --app-safe-top: var(--safe-area-inset-top, env(safe-area-inset-top, 0px));
+  --app-safe-bottom: var(--safe-area-inset-bottom, env(safe-area-inset-bottom, 0px));
+  --app-safe-left: var(--safe-area-inset-left, env(safe-area-inset-left, 0px));
+  --app-safe-right: var(--safe-area-inset-right, env(safe-area-inset-right, 0px));
+}
+.app-safe-screen {
+  min-height: 100dvh;
+  padding-left: var(--app-safe-left);
+  padding-right: var(--app-safe-right);
+}
+.app-safe-content {
+  min-height: 100dvh;
+  padding-bottom: calc(7rem + var(--app-safe-bottom));
+}
+.app-safe-header {
+  padding-top: calc(1rem + var(--app-safe-top));
+}
+.app-safe-nav {
+  bottom: calc(0.75rem + var(--app-safe-bottom));
+  left: calc(50% + (var(--app-safe-left) - var(--app-safe-right)) / 2);
+  width: calc(100% - 1.5rem - var(--app-safe-left) - var(--app-safe-right));
+}
+/* Portaled dialogs need their own bounds because they render outside main. */
+.app-safe-dialog {
+  top: calc((100dvh + var(--app-safe-top) - var(--app-safe-bottom)) / 2);
+  left: calc(50% + (var(--app-safe-left) - var(--app-safe-right)) / 2);
+  width: calc(100% - 2rem - var(--app-safe-left) - var(--app-safe-right));
+  max-height: min(90dvh, calc(100dvh - var(--app-safe-top) - var(--app-safe-bottom) - 2rem));
+  overflow-y: auto;
+}
 button {
   cursor: pointer;
 }

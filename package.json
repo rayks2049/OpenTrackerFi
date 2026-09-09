@@ -11,7 +11,7 @@
     "build:mobile": "vite build --config vite.mobile.config.ts",
     "android:sync": "npm run build:mobile && cap sync android",
     "android:open": "cap open android",
-    "android:debug": "npm run android:sync && cd android && gradlew.bat assembleDebug",
+    "android:debug": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-android.ps1",
     "start": "wrangler dev --config dist/server/wrangler.json",
     "test:qa": "node --test tests/finance-workflow.test.mjs",
     "lint": "oxlint",

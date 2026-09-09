@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import type { View, ParentCategory, FinanceData, Summary } from '@/src/types/finance';
 import { parents, parentColors, peso } from '@/src/lib/finance';
-import { Plan } from '@/src/features/plans/plan';
-import { InfoTip, TransactionRow } from '@/src/components/finance-ui';
+import { BalanceOverview } from '@/src/components/balance-overview';
+import { TransactionRow } from '@/src/components/finance-ui';
 import { getSpike, getLoggingStreak } from '@/src/features/analytics/calculations';
 
 export function Dashboard({
@@ -25,15 +25,8 @@ export function Dashboard({
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
-  const activeSubcategoryIds = new Set(
-    data.subcategories.filter((s) => !s.archived).map((s) => s.id),
-  );
-  const activeMonthlyExpenses = data.transactions.filter(
-    (t) =>
-      t.type === 'expense' &&
-      new Date(t.date) >= monthStart &&
-      (!t.subcategoryId || activeSubcategoryIds.has(t.subcategoryId)),
-  );
+  const activeMonthlyExpenses = data.transactions.filter((t) =>
+    t.type === 'expense' && new Date(t.date) >= monthStart && new Date(t.date) <= new Date());
   const grouped = parents
     .map((parent) => ({
       parent,
@@ -105,8 +98,8 @@ export function Dashboard({
               </div>
               <h2 className="text-2xl font-bold">Build your money trail</h2>
               <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                Complete the essentials, then log seven days to unlock a
-                stronger projection.
+                Complete the essentials, then log seven days to understand
+                your spending patterns.
               </p>
               <div className="mt-4 flex items-center gap-3">
                 <Progress
@@ -138,37 +131,7 @@ export function Dashboard({
         </Card>
       )}
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="relative overflow-hidden bg-primary text-primary-foreground md:col-span-2">
-          <div className="absolute -right-12 -top-12 size-48 rounded-full bg-white/7" />
-          <CardHeader>
-            <p className="text-xs font-bold uppercase tracking-[.15em] opacity-70">
-              Active account balance
-            </p>
-            <CardTitle className="text-4xl font-bold md:text-5xl">
-              {peso.format(summary.liquid)}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex justify-between gap-4">
-            <div>
-              <p className="flex items-center gap-1 text-sm opacity-70">
-                Safe today{' '}
-                <InfoTip text="Estimated salary-based balance divided by days until payday." />
-              </p>
-              <p className="text-xl font-bold">{peso.format(summary.safe)}</p>
-            </div>
-            <div className="text-right">
-              <p className="flex items-center justify-end gap-1 text-sm opacity-70">
-                Salary minus expenses{' '}
-                <InfoTip text="Monthly salary minus expense entries logged this month. Allocations are not deducted." />
-              </p>
-              <p
-                className={`text-xl font-bold ${summary.projected < 0 ? 'text-amber-200' : ''}`}
-              >
-                {peso.format(summary.projected)}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <BalanceOverview data={data} summary={summary} className="md:col-span-2" />
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -178,7 +141,7 @@ export function Dashboard({
           <CardContent className="space-y-3">
             <div>
               <p className="text-xs text-muted-foreground">
-                Logged expenses vs saved/invested
+                Contributions / logged expenses
               </p>
               <p className="text-2xl font-bold">
                 {Math.round(summary.ratio * 100)}%

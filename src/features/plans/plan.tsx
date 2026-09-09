@@ -5,20 +5,20 @@ import { AlertTriangle, BarChart3, PiggyBank, ShieldCheck, TrendingDown, Trendin
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Progress } from '@/components/ui/progress';
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { CartesianGrid, Line, LineChart, ReferenceDot, XAxis, YAxis } from 'recharts';
 import type { Period, FinanceData, Summary } from '@/src/types/finance';
 import { peso, periodDays } from '@/src/lib/finance';
-import { Activity } from '@/src/features/activity/activity';
-import { InfoTip, Metric } from '@/src/components/finance-ui';
+import { BalanceOverview } from '@/src/components/balance-overview';
+import { EmergencyFund } from '@/src/features/plans/emergency-fund';
+import { Metric } from '@/src/components/finance-ui';
 import { activitySeries, analyze } from '@/src/features/analytics/calculations';
 
 export const activityChartConfig = {
   expenses: { label: 'Expenses', color: '#e11d48' },
-  savings: { label: 'Savings', color: '#059669' },
-  investments: { label: 'Investments', color: '#4f46e5' },
-  planned: { label: 'Salary-based expense limit', color: '#d97706' },
+  savings: { label: 'Savings contributed', color: '#059669' },
+  investments: { label: 'Investments contributed', color: '#4f46e5' },
+  planned: { label: 'Expense plan (prorated)', color: '#d97706' },
 } satisfies ChartConfig;
 
 export function Plan({
@@ -44,9 +44,6 @@ export function Plan({
     () => analyze(data.transactions, periodDays[period]),
     [data.transactions, period],
   );
-  const savingsBalance = data.transactions
-    .filter((transaction) => transaction.type === 'saving')
-    .reduce((sum, transaction) => sum + transaction.amount, 0);
   const chartSeries = useMemo(
     () => activitySeries(data, period),
     [data, period],
@@ -81,7 +78,7 @@ export function Plan({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-sm text-muted-foreground">
-            Projection and behavior from your recorded data.
+            Current balances and recorded contributions, shown separately.
           </p>
           <h1 className="text-3xl font-bold">Activity Summary</h1>
         </div>
@@ -97,6 +94,8 @@ export function Plan({
           ))}
         </div>
       </div>
+      <BalanceOverview data={data} summary={summary} />
+      <p className="text-xs text-muted-foreground">The period selector applies to contribution totals and activity below. Account balances are current; salary and budget indicators use this month.</p>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Metric
           label="Expenses"
@@ -104,17 +103,17 @@ export function Plan({
           icon={<TrendingDown />}
         />
         <Metric
-          label="Saved"
+          label="Savings contributed"
           value={peso.format(analytics.savings)}
           icon={<PiggyBank />}
         />
         <Metric
-          label="Invested"
+          label="Investments contributed"
           value={peso.format(analytics.investments)}
           icon={<TrendingUp />}
         />
         <Metric
-          label="Savings + investment ratio"
+          label="Contributions / expenses"
           value={`${Math.round(analytics.ratio * 100)}%`}
           icon={<BarChart3 />}
         />
@@ -124,8 +123,8 @@ export function Plan({
           <CardHeader>
             <CardTitle>{chartTitle}</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Peaks mark periods where expenses reached the salary-based limit
-              or exceeded savings and investments combined.
+              Peaks mark periods at or above your prorated expense plan.
+              The line uses your current plan; it is not a forecast or a saved past budget.
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -236,116 +235,11 @@ export function Plan({
             )}
           </CardContent>
         </Card>
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between gap-3">
-                <CardTitle className="flex items-center gap-2">
-                  Salary-based projection{' '}
-                  <InfoTip text="Salary minus expense activities logged in the current month." />
-                </CardTitle>
-                {analytics.expenseDayCount < 7 && (
-                  <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-bold text-amber-700 dark:text-amber-300">
-                    Limited data
-                  </span>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Monthly salary</span>
-                <b>{peso.format(data.salary)}</b>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">
-                  Expenses logged this month
-                </span>
-                <b>
-                  {peso.format(summary.expenses)} ·{' '}
-                  {Math.round(
-                    (summary.expenses / Math.max(1, data.salary)) * 100,
-                  )}
-                  %
-                </b>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">
-                  Savings logged this month
-                </span>
-                <b>
-                  {peso.format(summary.savings)} ·{' '}
-                  {Math.round(
-                    (summary.savings / Math.max(1, data.salary)) * 100,
-                  )}
-                  %
-                </b>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">
-                  Investments logged this month
-                </span>
-                <b>
-                  {peso.format(summary.investments)} ·{' '}
-                  {Math.round(
-                    (summary.investments / Math.max(1, data.salary)) * 100,
-                  )}
-                  %
-                </b>
-              </div>
-              <div className="flex justify-between gap-4">
-                <span className="text-muted-foreground">
-                  Daily expense average
-                </span>
-                <b>{peso.format(summary.dailyAverage)}</b>
-              </div>
-              <div className="border-t pt-3">
-                <p className="text-xs text-muted-foreground">
-                  Projected salary-based balance
-                </p>
-                <p
-                  className={`text-3xl font-bold ${summary.projected < 0 ? 'text-amber-600' : ''}`}
-                >
-                  {peso.format(summary.projected)}
-                </p>
-                <p className="mt-2 text-xs leading-5 text-muted-foreground">
-                  Monthly salary minus expense entries logged during the current
-                  month. Monthly allocations are excluded.
-                </p>
-                <p className="mt-3 rounded-xl bg-amber-500/10 p-3 text-xs leading-5 text-amber-800 dark:text-amber-300">
-                  This is an estimate based only on activities you record.
-                  Missing, delayed, or unusual expenses can change the result
-                  {analytics.expenseDayCount < 7
-                    ? '; seven distinct logging days are recommended'
-                    : ''}
-                  .
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Emergency fund</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-3 flex justify-between">
-                <b>{peso.format(savingsBalance)}</b>
-                <span className="text-xs text-muted-foreground">
-                  of {peso.format(data.emergencyTarget)}
-                </span>
-              </div>
-              <Progress
-                value={Math.min(
-                  100,
-                  (savingsBalance / Math.max(1, data.emergencyTarget)) * 100,
-                )}
-              />
-            </CardContent>
-          </Card>
-        </div>
+        <EmergencyFund data={data} summary={summary} setData={setData} />
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Recommended plan limits</CardTitle>
+          <CardTitle>Contribution targets</CardTitle>
           <p className="text-sm text-muted-foreground">
             Customize your monthly savings range and investment cap.
           </p>
@@ -420,11 +314,10 @@ export function Plan({
         <CardContent className="flex gap-3">
           <ShieldCheck className="size-5 shrink-0 text-indigo-600" />
           <p className="text-sm leading-6 text-muted-foreground">
-            <b className="text-foreground">Manual investment values only.</b>{' '}
-            Investment amounts shown here use your initial entries and manual
-            adjustments. Actual value may differ from DragonFi, GStocks, GFunds,
-            Binance, MEXC, or another platform because market fluctuations are
-            not integrated yet.
+            <b className="text-foreground">Recorded contributions, not current holdings.</b>{' '}
+            Savings and investment entries reduce the selected account and record a contribution.
+            They do not credit a destination account, track market value, or measure your emergency fund.
+            Contribution history remains after account deletion and is never added to account balances.
           </p>
         </CardContent>
       </Card>

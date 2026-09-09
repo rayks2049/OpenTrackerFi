@@ -46,7 +46,9 @@ test('extracted analytics ignore corrections and preserve allocation independenc
   assert.equal(actual.ratio, 0.35);
   const before = activitySeries(data, '30d');
   data.subcategories = [];
-  assert.deepEqual(activitySeries(data, '30d'), before);
+  const after = activitySeries(data, '30d');
+  assert.deepEqual(after.map(({ planned, peak, ...point }) => point), before.map(({ planned, peak, ...point }) => point));
+  assert.ok(after.every((point) => point.planned === 0 && !point.peak));
 });
 
 test('extracted backup service encrypts and restores real finance data', async () => {
@@ -58,6 +60,85 @@ test('extracted backup service encrypts and restores real finance data', async (
 });
 
 const SEPTEMBER_3 = new Date('2026-09-03T12:00:00+08:00');
+
+test('real summary keeps salary shortfall separate from already-debited balances', async () => {
+  const { summarizeFinance } = await import(await financeModuleUrl('src/lib/balance-summary'));
+  const data = { ...fixture(), nextPayday: '2026-09-15', accounts: [
+    { id: 'wallet', balance: 5000 }, { id: 'reserve', balance: 2000 },
+  ], emergencyAccountIds: ['reserve'], transactions: [
+    { type: 'expense', amount: 13000, date: '2026-09-02T00:00:00Z' },
+    { type: 'saving', amount: 500, date: '2026-09-02T00:00:00Z' },
+    { type: 'investment', amount: 300, date: '2026-09-02T00:00:00Z' },
+    { type: 'expense', amount: 99999, date: '2026-10-02T00:00:00Z' },
+  ] };
+  const result = summarizeFinance(data, SEPTEMBER_3);
+  assert.equal(result.liquid, 7000);
+  assert.equal(result.availableBalance, 5000);
+  assert.equal(result.emergencyBalance, 2000);
+  assert.equal(result.salaryShortfall, 1000);
+  assert.equal(result.projected, -1000);
+  assert.equal(result.savings, 500);
+  assert.equal(result.investments, 300);
+  assert.equal(summarizeFinance({ ...data, emergencyTarget: 999999 }, SEPTEMBER_3).availableBalance, 5000);
+});
+
+test('permanent account deletion changes balances without deleting or reversing history', async () => {
+  const { deleteAccount, summarizeFinance } = await import(await financeModuleUrl('src/lib/balance-summary'));
+  const data = { ...fixture(), nextPayday: '2026-09-15', emergencyAccountIds: ['gcash'],
+    adjustments: [{ id: 'correction', accountId: 'gcash', amount: 100, reason: 'Balance check' }] };
+  const next = deleteAccount(data, 'gcash');
+  assert.deepEqual(next.accounts, []);
+  assert.deepEqual(next.emergencyAccountIds, []);
+  assert.deepEqual(next.transactions, data.transactions);
+  assert.deepEqual(next.adjustments, data.adjustments);
+  const result = summarizeFinance(next, SEPTEMBER_3);
+  assert.equal(result.liquid, 0);
+  assert.equal(result.emergencyBalance, 0);
+  assert.equal(result.expenses, 185);
+  assert.equal(result.savings, 500);
+  assert.equal(result.projected, 11815);
+  assert.equal(data.accounts.length, 1);
+});
+
+test('budget warnings use expense allocations and exact thresholds independently of salary', async () => {
+  const { summarizeFinance } = await import(await financeModuleUrl('src/lib/balance-summary'));
+  const data = { ...fixture(), nextPayday: '2026-09-15', subcategories: [
+    { parent: 'Food', plannedAmount: 1000 },
+    { parent: 'Savings', plannedAmount: 9000 },
+    { parent: 'Investments', plannedAmount: 8000 },
+    { parent: 'Bills', plannedAmount: 1000, archived: true },
+  ] };
+  for (const [amount, expected] of [[799.99, 'within'], [800, 'approaching'], [1000, 'approaching'], [1000.01, 'over']]) {
+    const result = summarizeFinance({ ...data, transactions: [{ type: 'expense', amount, date: '2026-09-02T00:00:00Z' }] }, SEPTEMBER_3);
+    assert.equal(result.expenseBudget, 1000);
+    assert.equal(result.budgetStatus, expected);
+    assert.equal(result.salaryShortfall, 0);
+  }
+  const unset = summarizeFinance({ ...data, salary: 0, subcategories: [], transactions: [{ type: 'expense', amount: 200, date: '2026-09-02T00:00:00Z' }] }, SEPTEMBER_3);
+  assert.equal(unset.budgetStatus, 'unset');
+  assert.equal(unset.salaryShortfall, 200);
+});
+
+test('emergency balances handle duplicate selections, removed accounts and overdrafts', async () => {
+  const { accountTotals } = await import(await financeModuleUrl('src/lib/balance-summary'));
+  const result = accountTotals({ ...fixture(), accounts: [
+    { id: 'a', balance: 100.10 }, { id: 'b', balance: -20.20 }, { id: 'old', balance: 9000, archived: true },
+  ], emergencyAccountIds: ['a', 'a', 'b', 'old', 'missing'] });
+  assert.deepEqual(result, { liquid: 79.9, emergencyBalance: 100.1, availableBalance: -20.2 });
+});
+
+test('migration finalizes removed accounts while preserving history and valid emergency selections', async () => {
+  const { migrate } = await import(await financeModuleUrl('src/services/local-storage'));
+  const data = { ...fixture(), version: 4, accounts: [...fixture().accounts, { id: 'old', balance: 500, archived: true }],
+    emergencyAccountIds: ['gcash', 'gcash', 'old', 'missing'], adjustments: [{ id: 'old-correction', accountId: 'old', amount: 5 }] };
+  const result = migrate(data);
+  assert.equal(result.accounts.length, 1);
+  assert.deepEqual(result.emergencyAccountIds, ['gcash']);
+  assert.deepEqual(result.transactions, data.transactions);
+  assert.deepEqual(result.adjustments, data.adjustments);
+  const legacy = { ...data, emergencyAccountIds: undefined };
+  assert.deepEqual(migrate(legacy).emergencyAccountIds, []);
+});
 
 function isCurrentMonth(isoDate, now = SEPTEMBER_3) {
   const date = new Date(isoDate);
@@ -148,6 +229,7 @@ function fixture() {
   return {
     salary: 12000,
     emergencyTarget: 24000,
+    emergencyAccountIds: [],
     plan: {
       minSavingsPercent: 10,
       maxSavingsPercent: 20,
@@ -321,22 +403,24 @@ test('source wiring keeps projection and logging placement aligned', async () =>
     'features/activity/add-dialog.tsx',
     'features/plans/plan.tsx',
     'features/analytics/calculations.ts',
+    'lib/balance-summary.ts',
+    'components/balance-overview.tsx',
   ];
   const source = (await Promise.all(modules.map((path) =>
     readFile(new URL(`../src/${path}`, import.meta.url), 'utf8'),
   ))).join('\n');
-  assert.match(source, /const projected = data\.salary - expenses;/);
+  assert.match(source, /const projected = money\(data\.salary - expenses\);/);
   assert.match(source, /onLogExpense=\{\(\) => setAddOpen\(true\)\}/);
   assert.match(source, />Log activity</);
   assert.match(source, /<CardTitle>Monthly allocations<\/CardTitle>/);
   assert.match(source, /if \(daily\.size < 7\) return null;/);
-  assert.match(source, /Limited data/);
+  assert.match(source, /Log expenses for at least 7 days/);
   assert.match(source, /Classified as/);
   assert.doesNotMatch(source, /Account type/);
   assert.doesNotMatch(source, /<DialogTitle>Log daily expense<\/DialogTitle>/);
   assert.doesNotMatch(source, /onAddEntry=\{\(\) => setAddOpen\(true\)\}/);
   assert.match(
     source,
-    /Monthly salary minus expense entries logged during the\s+current\s+month\. Monthly allocations are excluded\./,
+    /the shortfall is not deducted again\./,
   );
 });

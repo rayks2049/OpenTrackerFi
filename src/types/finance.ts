@@ -71,6 +71,7 @@ export type FinanceData = {
   salary: number;
   nextPayday: string;
   emergencyTarget: number;
+  emergencyAccountIds?: string[];
   plan: PlanPreferences;
   accounts: Account[];
   subcategories: Subcategory[];
@@ -79,6 +80,12 @@ export type FinanceData = {
 };
 
 export type Summary = {
+  emergencyBalance: number;
+  availableBalance: number;
+  expenseBudget: number;
+  budgetStatus: 'unset' | 'within' | 'approaching' | 'over';
+  budgetExcess: number;
+  salaryShortfall: number;
   liquid: number;
   expenses: number;
   savings: number;

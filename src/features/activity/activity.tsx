@@ -136,7 +136,7 @@ export function Activity({
                   </p>
                   <p className="truncate text-xs text-muted-foreground">
                     {item.transaction.parent} · {item.transaction.accountLabel}{' '}
-                    ·{' '}
+                    {!data.accounts.some((account) => account.id === item.transaction.accountId && !account.archived) ? ' · Deleted account' : ''} ·{' '}
                     {new Date(item.transaction.date).toLocaleDateString(
                       'en-PH',
                     )}
@@ -170,7 +170,7 @@ export function Activity({
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-semibold">Balance correction</p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {item.adjustment.reason} ·{' '}
+                    {item.adjustment.reason}{!data.accounts.some((account) => account.id === item.adjustment.accountId) ? ' · Deleted account' : ''} ·{' '}
                     {new Date(item.adjustment.date).toLocaleDateString('en-PH')}
                   </p>
                 </div>
